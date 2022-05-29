@@ -3,8 +3,7 @@ weather/
 notebooks/.ipynb_checkpoints/
 keys/
 .DS_Store
-config.py
-
+g
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
