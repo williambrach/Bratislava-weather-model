@@ -4,42 +4,75 @@ import time
 import csv
 from bs4 import BeautifulSoup
 import sched, time
+from datetime import datetime
+from yoo_telegram import Notifier
+import pygsheets
+from config import BOT_TOKEN, TELEGRAM_USER
 
-SECONDS = 60 * 30
-header = ['time', 'station', 'temperature', 'wind_dir', 'wind_speed', "wind_impact", "clouds", "weather"]
-with open('weather.csv', 'w', encoding='utf-8') as f:
-    writer = csv.writer(f)
-    writer.writerow(header)
-s = sched.scheduler(time.time, time.sleep)
 
-# get data func
+client = Notifier(BOT_TOKEN)
+gc = pygsheets.authorize(
+    service_file="keys/bratislava-weather-trends-b9b47037fa19.json"
+)
+SECONDS = 60 * 60
+
+
 def getData(sc):
-    url = 'http://www.shmu.sk/sk/?page=59'
-    response = requests.get(url)
-    
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    time = soup.findAll('h3')[0].text.strip()
-    
-    with open('weather.csv','a',encoding='utf-8') as fd:
-        writer = csv.writer(fd)
-        for row in soup.findAll('table')[0].find_all('tr'):
+    try:
+        sh = gc.open("weather-data")
+        wks = sh.sheet1
+
+        url = "http://www.shmu.sk/sk/?page=59"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        time = datetime.now().strftime("%Y/%m/%d %H:%M")
+        for row in soup.findAll("table")[0].find_all("tr"):
             columns = row.find_all("td")
-            if columns[0].text not in ("Bratislava - Mlynská Dolina", "Bratislava Ivanka", "Bratislava Koliba"):
+            if columns[0].text not in (
+                "Bratislava - Mlynská Dolina",
+                "Bratislava Koliba",
+            ):
                 continue
             else:
                 station = columns[0].text.strip()
-                temperature = columns[1].text.strip()
+                temperature = columns[1].text.strip().split(" ")[0]
                 wind_dir = columns[2].text.strip()
-                wind_speed = columns[3].text.strip()
-                wind_impact = columns[4].text.strip()
-                clouds = columns[5].text.strip()
-                weather = columns[6].text.strip()
-                writer.writerow([time,station, temperature, wind_dir, wind_speed, wind_impact, clouds, weather])
-    
-    
-    s.enter(SECONDS, 1, getData, (sc,))
+                wind_speed = columns[3].text.strip().split(" ")[0]
+                wind_gusts = columns[4].text.strip()
+                pressure = columns[5].text.strip().split(" ")[0]
+                clouds = columns[6].text.strip()
+                weather = columns[7].text.strip()
 
-# main
-s.enter(SECONDS, 1, getData, (s,))
-s.run()
+            wks.insert_rows(
+                1,
+                number=1,
+                values=[
+                    time,
+                    station,
+                    temperature,
+                    wind_dir,
+                    wind_speed,
+                    wind_gusts,
+                    pressure,
+                    clouds,
+                    weather,
+                ],
+                inherit=False,
+            )
+
+    except Exception as e:
+        time = datetime.now().strftime("%Y/%m/%d %H:%M")
+        e_msg = f"{time} - Bratislava weather - {str(e)}"
+        client.sendMessage(TELEGRAM_USER, e_msg)
+
+    sc.enter(SECONDS, 1, getData, (sc,))
+
+
+def main():
+    s = sched.scheduler(time.time, time.sleep)
+    s.enter(SECONDS, 1, getData, (s,))
+    s.run()
+
+
+if __name__ == "__main__":
+    main()
