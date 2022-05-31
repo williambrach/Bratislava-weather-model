@@ -59,20 +59,24 @@ def getData(sc):
                 ],
                 inherit=False,
             )
-
+        sc.enter(SECONDS, 1, getData, (sc,))
     except Exception as e:
         time = datetime.now().strftime("%Y/%m/%d %H:%M")
         e_msg = f"{time} - Bratislava weather - {str(e)}"
         client.sendMessage(TELEGRAM_USER, e_msg)
-
-    sc.enter(SECONDS, 1, getData, (sc,))
+        sc.enter(SECONDS, 1, getData, (sc,))
 
 
 def main():
-    s = sched.scheduler(time.time, time.sleep)
-    s.enter(SECONDS, 1, getData, (s,))
-    s.run()
-
+    try:
+        s = sched.scheduler(time.time, time.sleep)
+        s.enter(SECONDS, 1, getData, (s,))
+        s.run()
+    except Exception as e:
+        time = datetime.now().strftime("%Y/%m/%d %H:%M")
+        e_msg = f"{time} - Bratislava weather - {str(e)}"
+        client.sendMessage(TELEGRAM_USER, e_msg)
+        
 
 if __name__ == "__main__":
     main()
